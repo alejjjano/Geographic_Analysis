@@ -1,3 +1,6 @@
+# Script to find the closest point form a Base point in an ArcMap Shapefile
+# The project interpreter for this file should be: Python27\ArcGis10.5\python.exe
+
 import numpy as np
 import math
 import arcpy
@@ -74,7 +77,7 @@ def closestPoint(PointO, PointList):
     return closest
 
 
-coords = SHPtoLatLong("C:\Users\DTORERO\Documents\Python\SHP base\Network Analysis.gdb\Nodes")
+coords = SHPtoLatLong("Test_Data\Network Analysis.gdb\Nodes")
 
 xyList = coords[1:]
 print(xyList)
