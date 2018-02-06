@@ -51,26 +51,26 @@ class ArcPoint(object):
         """
         Calculates the distance between two ArcPoint objects,
         from its coordinates values using the Haversine formula
-        :param other: ArcPoint Object to calculate the distance to
+        :param other: ArcPoint Object to calculate distante to
         :return:
         """
 
         """
         Calculates the distance between two ArcPoint objects,
         from its coordinates values using the Haversine formula
-        
-        
         :param PointO: array([Latitude O,Longitude O])
         :param PointU: array([Latitude U,Longitude U])
         :return: distance between two points
         """
+        PointU = 0
+
         R = 6371  # Radius of the earth in km
-        D = PointU - PointO
+        D = other.get_coords() - self.get_coords()
         dLat = hexToRad(D[0])
         dLon = hexToRad(D[1])
 
         # Haversine formula for calculating the distance
-        a = math.sin(dLat / 2) ** 2 + math.cos(hexToRad(PointO[0])) * math.cos(hexToRad(PointU[0])) * math.sin(
+        a = math.sin(dLat / 2) ** 2 + math.cos(hexToRad(self.get_coords()[0])) * math.cos(hexToRad(other.get_coords()[0])) * math.sin(
             dLon / 2) * math.sin(dLon / 2)
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
         distance = R * c
