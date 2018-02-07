@@ -106,6 +106,64 @@ class ExcPoint(object):
 
         return distance
 
+# Define variable Column Indexes
+
+def defineColumnIndexes():
+    """Helper function to define Column Indexes in an Excel"""
+    columnIndexes = [char for char in string.ascii_uppercase]
+    for i in string.ascii_uppercase:
+        for j in string.ascii_uppercase:
+            columnIndexes.append(i + j)
+    return columnIndexes
+
+
+def readHeader(sheet, header, exceptions = []):
+    """
+    Reads the header and returns a list of Column names
+    :param sheet: sheet to read
+    :param header: header row Index
+    :param exceptions: list of Indexes from columns to ignore
+    :return: a dictionary with header Index and names:
+            {columnIndex (str) -> columnName (str) }
+    """
+
+    columnIndexes = defineColumnIndexes()
+    for excepted in exceptions:
+        columnIndexes.remove(excepted)
+
+    headerDict = {}
+
+    index = 0
+    cursor = sheet[columnIndexes[index] + str(header)]
+    while cursor.value is not None:
+        headerDict[columnIndexes[index]] = cursor.value
+        index += 1
+        cursor = sheet[columnIndexes[index] + str(header)]
+
+    return headerDict
+
+
+def readRow(rowIndex,sheet,columnList):
+    """
+    helper function to read each row of the sheet and retrieve data
+    :param rowIndex: index of row to read
+    :param sheet: sheet to read
+    :param columnList: list of column Indexes
+    :return: a dictionary: columnIndex -> data
+    """
+    pass
+
+
+def searchCol(columnNameList, sheet, header):
+    """
+    Helper function
+    :param columnNameList: string, column to search
+    :param sheet: sheet to look into
+    :param header: the index of the header row
+    :return: Index of column to search, as a letter
+    """
+    pass
+
 
 def pointMap(filename, sheet = "Hoja 1", header = 1):
     """
@@ -121,45 +179,15 @@ def pointMap(filename, sheet = "Hoja 1", header = 1):
 
     # Start of helper function
 
-    columnChars = [char for char in string.ascii_uppercase]
-    for i in string.ascii_uppercase:
-        for j in string.ascii_uppercase:
-            columnChars.append(i + j)
-    print(columnChars)
 
     #Read header
 
-    h = 0
-    cursor = sheet[columnChars[index] + str(header)]
-    while cursor.value is not None:
-        if cursor.value in columnNameList:
-            return columnChars[index]
-        index += 1
-        cursor = sheet[columnChars[index] + str(header)]
-    raise ValueError("Column " + columnNameList + " not in Worksheet")
 
     columnList =[]
 
 
-    def readRow(row,sheet,columnList)
 
-    def searchCol(columnNameList, sheet, header):
-        """
-        Helper function
-        :param columnNameList: string, column to search
-        :param sheet: sheet to look into
-        :param header: the index of the header row
-        :return: Index of column to search, as a letter
-        """
 
-        index = 0
-        cursor = sheet[columnChars[index] + str(header)]
-        while cursor.value is not None:
-            if cursor.value in columnNameList:
-                return columnChars[index]
-            index += 1
-            cursor = sheet[columnChars[index] + str(header)]
-        raise ValueError("Column " + columnNameList + " not in Worksheet")
 
     # End of helper function
 
