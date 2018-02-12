@@ -10,6 +10,7 @@
 # Defs
 
 
+import string
 import openpyxl
 import numpy as np
 import math
@@ -26,7 +27,7 @@ class ExcPoint(object):
         """
         :param id: ObjectID from the class
         :param aTable:  attributes from excel table
-                        becomes a dictionary containing fields and values
+                        becomes a dictionary containing field indexes and values
         :param coords: nympy array containing latitude and longitude
         """
         ExcPoint.idCounter += 1
@@ -108,6 +109,16 @@ class ExcPoint(object):
 
 # Define variable Column Indexes
 
+def readExcelSheet(filename, sheetname = "Hoja1"):
+    """
+    Reads an excel file and returns the sheet object
+    :param filename: Excel filename
+    :param sheetname: Sheet name
+    :return: sheet instance
+    """
+    return openpyxl.load_workbook(filename).get_sheet_by_name(sheetname)
+
+
 def defineColumnIndexes():
     """Helper function to define Column Indexes in an Excel"""
     columnIndexes = [char for char in string.ascii_uppercase]
@@ -117,33 +128,55 @@ def defineColumnIndexes():
     return columnIndexes
 
 
-def readHeader(sheet, header, exceptions = []):
+def readHeader(sheet, header, latNames = ["LAT", "LATITUDE", "Latitud", "Y"],
+               longNames = ["LONG", "LONGITUDE", "Longitud", "X"]):
     """
     Reads the header and returns a list of Column names
     :param sheet: sheet to read
     :param header: header row Index
-    :param exceptions: list of Indexes from columns to ignore
-    :return: a dictionary with header Index and names:
+    :param latNames: list of names to consider latitude
+    :param longNames: list of names to consider longitude
+    :return: a tuple with two components:
+            list with [lat, long] indexes
+            dictionary with header Index and names:
             {columnIndex (str) -> columnName (str) }
     """
 
     columnIndexes = defineColumnIndexes()
-    for excepted in exceptions:
-        columnIndexes.remove(excepted)
+
+    latFlag = False
+    longFlag = False
 
     headerDict = {}
+    coordList = [0,0]
 
     index = 0
+
     cursor = sheet[columnIndexes[index] + str(header)]
+
     while cursor.value is not None:
+
+        # Check if latitude and longitude are present in the header
+        if cursor.value in latNames:
+            latFlag = True
+            coordList[0] = columnIndexes[index]
+        if cursor.value in longNames:
+            longFlag = True
+            coordList[1] = columnIndexes[index]
+
+        # Reading data from header
         headerDict[columnIndexes[index]] = cursor.value
         index += 1
         cursor = sheet[columnIndexes[index] + str(header)]
 
-    return headerDict
+    # Return if latitude and longitude are present in the header
+    if latFlag and longFlag:
+        return (coordList, headerDict)
+    else:
+        raise ValueError("Latitude and Longitude not present in the header")
 
 
-def readRow(rowIndex,sheet,columnList):
+def readRow(rowIndex, sheet, columnList):
     """
     helper function to read each row of the sheet and retrieve data
     :param rowIndex: index of row to read
@@ -151,7 +184,14 @@ def readRow(rowIndex,sheet,columnList):
     :param columnList: list of column Indexes
     :return: a dictionary: columnIndex -> data
     """
-    pass
+
+    rowData = {}
+
+    for index in columnList:
+        cursor = sheet[index + str(rowIndex)]
+        rowData[index] = cursor.value
+
+    return rowData
 
 
 def searchCol(columnNameList, sheet, header):
@@ -165,7 +205,47 @@ def searchCol(columnNameList, sheet, header):
     pass
 
 
-def pointMap(filename, sheet = "Hoja 1", header = 1):
+def sortByFunction(itemList, orderFunction, limit = math.pi):
+    """
+    orders the itmes by a determined property of the items
+    :param itemListWork: list of items to be ordered
+    :param orderFunction: function to apply to the items. the result determines the order in wich the items will be
+                          sorted. It must return a type in wich < > operations can be applied.
+    :param limit: the max value of the orderFunction(itemList) to be considered.
+                  after reached that value, the sorting algorith stops
+    :return: ordered list of items, by orderFunction result, until the limit stablished
+    """
+
+    itemListWork = itemList.copy()
+
+    funcList = [orderFunction(item) for item in itemListWork]
+
+    # Pi is just a non probable value to define the limit
+    # So, If the user doesn't sets a value, its considered the maximum possible value in the funcList
+    if limit == math.pi:
+        limit = max(funcList)
+
+    ordered = 0
+    n = len(itemListWork)
+
+    # Enter the loop until all values are sorted or the limit is reached
+    while ordered <= n - 1 and funcList[ordered] < limit:
+
+        index = -1
+        while index >= ordered - n + 1:
+            # Compare values of index and preindex in funcList
+            if funcList[index] < funcList[index - 1]:
+                # Flip index with preindex in both lists
+                (itemListWork[index], itemListWork[index - 1]) = (itemListWork[index - 1], itemListWork[index])
+                (funcList[index], funcList[index - 1]) = (funcList[index - 1], funcList[index])
+            index -= 1
+
+        ordered += 1
+
+    return itemListWork
+
+
+def pointMap(filename, sheetname = "Hoja1", header = 1):
     """
     Transforms a xlsx file into a list of ExcPoints
     :param filename: filename of the Excel workbook
@@ -175,46 +255,36 @@ def pointMap(filename, sheet = "Hoja 1", header = 1):
     """
 
     #Read sheet
-    sheet = openpyxl.load_workbook(filename).get_sheet_by_name(sheet)
-
-    # Start of helper function
+    sheet = readExcelSheet(filename, sheetname)
 
 
-    #Read header
+    # Read header and find Lat and Long Columns
 
-
-    columnList =[]
-
-
-
-
-
-    # End of helper function
-
-    # Find lat and long columns
-
-    latNames = ["LAT", "LATITUDE", "Latidud", "Y"]
-    latIndex = searchCol(latNames, sheet, 1)
-
-    longNames = ["LONG", "LONGITUDE", "Longitud", "X"]
-    longIndex = searchCol(longNames, sheet, 1)
-
-    l = []
+    headerData = readHeader(sheet, header)
+    fields = headerData[1]
+    latIndex = headerData[0][0]
+    longIndex = headerData[0][1]
 
     # create point for each row and append to list
+
+    pointList = []
 
     i = header + 1
     cursor = sheet["A"+str(i)]
     while cursor.value is not None:
-        latValue = sheet[latIndex+str(i)]
-        longValue = sheet[longIndex+str(i)]
-        cx = np.array([latValue, longValue])
-        newPoint = ExcPoint({},cx)
-        l.append(newPoint)
+        latValue = sheet[latIndex+str(i)].value
+        longValue = sheet[longIndex+str(i)].value
+        coordinates = np.array([latValue, longValue])
+
+        data = readRow(i,sheet, fields.keys())
+
+        newPoint = ExcPoint(data,coordinates)
+        pointList.append(newPoint)
 
         i += 1
         cursor = sheet["A" + str(i)]
 
+    return pointList
 
 
 # ==============================================================================
@@ -222,15 +292,51 @@ def pointMap(filename, sheet = "Hoja 1", header = 1):
 # Main
 
 # Read file and transform to PointMap
+
+pointList = pointMap("C:/Users/DTORERO/Documents/Python/Geographic_Analysis/Geographic_Analysis/GeoXSLX/sheet_test.xlsx")
+
+#for point in pointList:
+#    print(point.get_coords())
+
+
 # Backup original list
+
+pointListBackUp = pointList.copy()
 
 # Enter main loop - One for each group
 
-    # Pick a point based of lowest latitude
+"""while len(pointList) > 0:
+
+    # Pick a point based of highest latitude
+    lats = [latPoint.get_coords()[0] for latPoint in pointList]
+    selectedPoint = pointList[lats.index(max(lats))]
+
+    # Move it to zeroth location
+    (pointList[0], pointList[lats.index(max(lats))]) = (selectedPoint, pointList[0])
 
     # Order Points by proximity from that point
-    # Or proximity to each other
     # Until max distance
+
+    maxDistance = 300
+
+    distanceCount = 0
+    while True:
+        index = -1
+        while index*(-1) < (len(pointList) - 1):
+            cursor = pointList[index]
+            precursor = pointList[index - 1]
+            if ExcPoint.distance(selectedPoint, cursor) < ExcPoint.distance(selectedPoint, precursor):
+                # Flip cursor with precursor
+                (pointList[index - 1], pointList[index]) = (cursor, precursor)
+            i += 1
+
+        if distance is too much:
+            break"""
+
+
+
+
+
 
     # Enter inner loop - One for each try
 
@@ -245,3 +351,15 @@ def pointMap(filename, sheet = "Hoja 1", header = 1):
     #Split list
 
 # Write Excel file with group values
+
+
+# ==============================================================================
+
+
+for i in pointList:
+    print(i.get_id())
+
+newList = sortByFunction(pointList, pointListBackUp[0].distance)
+
+for i in newList:
+    print(i.get_id())
