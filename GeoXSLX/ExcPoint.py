@@ -194,15 +194,25 @@ def readRow(rowIndex, sheet, columnList):
     return rowData
 
 
-def searchCol(columnNameList, sheet, header):
+def searchCol(columnNameList, sheet, header = 1):
     """
     Helper function
-    :param columnNameList: string, column to search
+    :param columnNameList: list of strings, possible names of the column to search
     :param sheet: sheet to look into
     :param header: the index of the header row
     :return: Index of column to search, as a letter
     """
-    pass
+
+    columnIndexes = defineColumnIndexes()
+
+    index = 0
+    cursor = sheet[columnIndexes[index] + str(header)]
+    while cursor.value is not None:
+        if cursor.value in columnNameList:
+            return columnIndexes[index]
+        index += 1
+        cursor = sheet[columnIndexes[index] + str(header)]
+    raise ValueError("Column " + columnNameList + " not in Worksheet")
 
 
 def sortByFunction(itemList, orderFunction, limit = math.pi):
@@ -213,7 +223,8 @@ def sortByFunction(itemList, orderFunction, limit = math.pi):
                           sorted. It must return a type in wich < > operations can be applied.
     :param limit: the max value of the orderFunction(itemList) to be considered.
                   after reached that value, the sorting algorith stops
-    :return: ordered list of items, by orderFunction result, until the limit stablished
+    :return: Tuple with:    (list of items sorted, by orderFunction result, until the limit stablished and
+                            ordered variable - index of sorted number until limit)
     """
 
     itemListWork = itemList.copy()
@@ -242,7 +253,7 @@ def sortByFunction(itemList, orderFunction, limit = math.pi):
 
         ordered += 1
 
-    return itemListWork
+    return (itemListWork, ordered)
 
 
 def pointMap(filename, sheetname = "Hoja1", header = 1):
@@ -292,20 +303,36 @@ def pointMap(filename, sheetname = "Hoja1", header = 1):
 # Main
 
 # Read file and transform to PointMap
+filename = "C:/Users/DTORERO/Documents/Python/Geographic_Analysis/Geographic_Analysis/GeoXSLX/sheet_test.xlsx"
+sheetname = "Hoja1"
+header = 1
 
-pointList = pointMap("C:/Users/DTORERO/Documents/Python/Geographic_Analysis/Geographic_Analysis/GeoXSLX/sheet_test.xlsx")
+filenameToSave = "C:/Users/DTORERO/Documents/Python/Geographic_Analysis/Geographic_Analysis/GeoXSLX/sheet_test_results.xlsx"
 
-#for point in pointList:
-#    print(point.get_coords())
+pointList = pointMap(filename, sheetname, header)
 
+book = openpyxl.load_workbook(filename)
+
+sheet = book.get_sheet_by_name(sheetname)
+
+
+# search particular columns (MPF)
+
+nameMPF = ["CANTIDAD DE MPF", "MPF", "MODULOS PREFABRICADOS"]
+columnIndexMPF = searchCol(nameMPF, sheet)
+print("Column index for MPF: " + str(columnIndexMPF))
 
 # Backup original list
-
 pointListBackUp = pointList.copy()
 
 # Enter main loop - One for each group
 
-"""while len(pointList) > 0:
+groupNum = 0
+
+while len(pointList) > 0:
+
+    groupNum += 1
+    print("GroupNum: " + str(groupNum))
 
     # Pick a point based of highest latitude
     lats = [latPoint.get_coords()[0] for latPoint in pointList]
@@ -316,50 +343,70 @@ pointListBackUp = pointList.copy()
 
     # Order Points by proximity from that point
     # Until max distance
+    maxDistance = 150
+    (pointList, topIndex) = sortByFunction(pointList, pointList[0].distance, maxDistance)
 
-    maxDistance = 300
+    # Enter inner loop
+    # Until all conditions are met
+    conditionFlag = True
 
-    distanceCount = 0
-    while True:
-        index = -1
-        while index*(-1) < (len(pointList) - 1):
-            cursor = pointList[index]
-            precursor = pointList[index - 1]
-            if ExcPoint.distance(selectedPoint, cursor) < ExcPoint.distance(selectedPoint, precursor):
-                # Flip cursor with precursor
-                (pointList[index - 1], pointList[index]) = (cursor, precursor)
-            i += 1
+    # Set initial max amount of IE and MPF
+    maxIE = min(12, len(pointList))
+    maxMPF = 25
 
-        if distance is too much:
-            break"""
-
-
-
-
-
-
-    # Enter inner loop - One for each try
-
+    while conditionFlag:
         # Count max IE
+        if topIndex + 1 > maxIE:
+            topIndex = maxIE - 1
+        else:
+            maxIE = topIndex + 1
+
         # Count max MPF
-        # Count max
-        # Tweek scope values for IE
+
+        print("topIndex: " + str(topIndex))
+
+        countMPF = 0
+        for i in range(topIndex + 1):
+            currentMPF = pointList[i].get_field_value(columnIndexMPF)
+            countMPF += currentMPF
+
+        if countMPF > maxMPF:
+            # Tweek scope values for IE
+            maxIE -= 1
+        else:
+            conditionFlag = False
 
     # Exit inner loop
 
-    #Set goup value to points
+    #Set group value to points
+
+    for i in range(topIndex + 1):
+        pointID = pointList[i].get_id()
+        for tryPoint in pointListBackUp:
+            if pointID == tryPoint.get_id():
+                tryPoint.set_group(groupNum)
+
     #Split list
+
+    print("PointListLenght: " + str(len(pointList)))
+    print("Number of items in group: " + str(topIndex+1))
+
+    pointList = pointList[topIndex + 1:]
+
+    print("PointListLenght after cut: " + str(len(pointList)))
 
 # Write Excel file with group values
 
+columnIndexes = defineColumnIndexes()
+columnToWrite = columnIndexes[len(pointListBackUp[0].get_fields())]
+
+sheet[columnToWrite + str(header)].value = "Grupos de Inspección"
+
+for point in pointListBackUp:
+    sheet[columnToWrite + str(point.get_id() + header)].value = point.get_group()
+
+# Save Excel File
+book.save(filenameToSave)
+print("Edited file saved as " + filenameToSave)
 
 # ==============================================================================
-
-
-for i in pointList:
-    print(i.get_id())
-
-newList = sortByFunction(pointList, pointListBackUp[0].distance)
-
-for i in newList:
-    print(i.get_id())
